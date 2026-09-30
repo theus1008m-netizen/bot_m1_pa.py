@@ -1,16 +1,30 @@
 import pandas as pd
 import numpy as np
 import requests
+import os
+import yfinance as yf
 
 # Credenciais oficiais do Telegram
 TELEGRAM_TOKEN = '8643990886:AAFpiqleSSN7-jT0HaxpfaIY102HWvSwQ3g'
 CHAT_ID = '1657742186'
 
-# Pares de alta liquidez para M1
-PARES_M1 = {
-    "EUR/USD": "EURUSDT",
-    "GBP/USD": "GBPUSDT",
-    "AUD/USD": "AUDUSDT"
+# Lista completa de Criptos (via Binance)
+PARES_CRIPTOS = {
+    "BTC/USDT": "BTCUSDT",
+    "ETH/USDT": "ETHUSDT",
+    "SOL/USDT": "SOLUSDT",
+    "XRP/USDT": "XRPUSDT",
+    "BNB/USDT": "BNBUSDT"
+}
+
+# Lista completa de Forex (via Yahoo Finance)
+PARES_MOEDAS = {
+    "EUR/USD": "EURUSD=X",
+    "GBP/USD": "GBPUSD=X",
+    "EUR/JPY": "EURJPY=X",
+    "AUD/USD": "AUDUSD=X",
+    "USD/JPY": "USDJPY=X",
+    "GBP/JPY": "GBPJPY=X"
 }
 
 def enviar_telegram(mensagem):
@@ -25,7 +39,7 @@ def enviar_telegram(mensagem):
     except Exception:
         pass
 
-def buscar_dados_m1(symbol):
+def buscar_dados_binance(symbol):
     url = f"https://data-api.binance.vision/api/v3/klines?symbol={symbol}&interval=1m&limit=100"
     try:
         response = requests.get(url, timeout=10)
@@ -49,7 +63,7 @@ def identificar_suporte_resistencia_e_pullback(df, nome_ativo):
     if df is None or df.empty or len(df) < 50:
         return
 
-    # Analisando a última vela fechada (-1) para projetar a entrada na próxima vela
+    # Analisando a última vela fechada (-1) para projetar a entrada na próxima vela de M1
     idx = -1
     o = df['open'].iloc[idx]
     c = df['close'].iloc[idx]
@@ -105,7 +119,28 @@ def identificar_suporte_resistencia_e_pullback(df, nome_ativo):
         enviar_telegram(sinal)
 
 if __name__ == "__main__":
-    for nome_ativo, ticker in PARES_M1.items():
-        df = buscar_dados_m1(ticker)
+    # Varrendo Criptos em M1
+    for nome_ativo, ticker in PARES_CRIPTOS.items():
+        df = buscar_dados_binance(ticker)
         if df is not None:
             identificar_suporte_resistencia_e_pullback(df, nome_ativo)
+
+    # Varrendo Forex em M1
+    for nome_ativo, ticker in PARES_MOEDAS.items():
+        try:
+            import sys
+            old_stdout = sys.stdout
+            sys.stdout = open(os.devnull, "w")
+            dados = yf.download(ticker, interval="1m", period="1d", progress=False)
+            sys.stdout.close()
+            sys.stdout = old_stdout
+            
+            if not dados.empty:
+                df = pd.DataFrame()
+                df['close'] = dados['Close'].squeeze()
+                df['open'] = dados['Open'].squeeze()
+                df['high'] = dados['High'].squeeze()
+                df['low'] = dados['Low'].squeeze()
+                identificar_suporte_resistencia_e_pullback(df, nome_ativo)
+        except Exception:
+            pass
