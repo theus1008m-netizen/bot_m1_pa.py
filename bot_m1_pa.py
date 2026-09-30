@@ -1,13 +1,12 @@
 import pandas as pd
 import numpy as np
-import ta
 import requests
 
-# === SUAS NOVAS CREDENCIAIS DO SEGUNDO TELEGRAM ===
-TELEGRAM_TOKEN = 'COLE_SEU_NOVO_TOKEN_AQUI'
-CHAT_ID = 'COLE_SEU_CHAT_ID_AQUI'
+# Credenciais oficiais do Telegram
+TELEGRAM_TOKEN = '8643990886:AAFpiqleSSN7-jT0HaxpfaIY102HWvSwQ3g'
+CHAT_ID = '1657742186'
 
-# Pares focados para M1 (alta liquidez)
+# Pares de alta liquidez para M1
 PARES_M1 = {
     "EUR/USD": "EURUSDT",
     "GBP/USD": "GBPUSDT",
@@ -27,7 +26,6 @@ def enviar_telegram(mensagem):
         pass
 
 def buscar_dados_m1(symbol):
-    # Buscando velas de 1 minuto na Binance para alta velocidade
     url = f"https://data-api.binance.vision/api/v3/klines?symbol={symbol}&interval=1m&limit=100"
     try:
         response = requests.get(url, timeout=10)
@@ -51,7 +49,7 @@ def identificar_suporte_resistencia_e_pullback(df, nome_ativo):
     if df is None or df.empty or len(df) < 50:
         return
 
-    # Analisando a última vela fechada (-1) para projetar a próxima (M1)
+    # Analisando a última vela fechada (-1) para projetar a entrada na próxima vela
     idx = -1
     o = df['open'].iloc[idx]
     c = df['close'].iloc[idx]
@@ -66,19 +64,17 @@ def identificar_suporte_resistencia_e_pullback(df, nome_ativo):
     pavio_inferior = min(o, c) - l
     pavio_superior = h - max(o, c)
 
-    # Topos e Fundos locais recentes (Simulando Zonas de Suporte e Resistência de Curto Prazo)
-     resistencia_recente = df['high'].iloc[-20:-1].max()
-     suporte_recente = df['low'].iloc[-20:-1].min()
+    # Zonas de Suporte e Resistência baseadas nos últimos candles
+    resistencia_recente = df['high'].iloc[-20:-1].max()
+    suporte_recente = df['low'].iloc[-20:-1].min()
 
-    # Padrões de Price Action M1
     toque_suporte = l <= suporte_recente + 0.0001
     toque_resistencia = h >= resistencia_recente - 0.0001
     
-    # Rejeição (Pavio forte respeitando a zona)
-    rejeicao_alta = pavio_inferior >= (corpo * 1.5) # Pavio 1.5x maior que o corpo em suporte
-    rejeicao_baixa = pavio_superior >= (corpo * 1.5) # Pavio 1.5x maior que o corpo em resistência
+    rejeicao_alta = pavio_inferior >= (corpo * 1.5)
+    rejeicao_baixa = pavio_superior >= (corpo * 1.5)
 
-    # Gatilho de Pullback / Rejeição em Suporte (CALL)
+    # Gatilho de Pullback / Rejeição em Suporte (CALL para a próxima vela)
     if toque_suporte and rejeicao_alta and c > o:
         sinal = (
             "🎯 *SINAL M1 - PRICE ACTION (CALL)* 🎯\n\n"
@@ -93,7 +89,7 @@ def identificar_suporte_resistencia_e_pullback(df, nome_ativo):
         )
         enviar_telegram(sinal)
 
-    # Gatilho de Pullback / Rejeição em Resistência (PUT)
+    # Gatilho de Pullback / Rejeição em Resistência (PUT para a próxima vela)
     if toque_resistencia and rejeicao_baixa and c < o:
         sinal = (
             "🎯 *SINAL M1 - PRICE ACTION (PUT)* 🎯\n\n"
