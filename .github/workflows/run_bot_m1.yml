@@ -1,4 +1,4 @@
-name: Executar Robo M1 Price Action
+name: Executar Robo M1 Fibonacci + POC
 
 on:
   schedule:
