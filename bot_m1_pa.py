@@ -4,6 +4,7 @@ import numpy as np
 import yfinance as yf
 import sys
 import os
+from datetime import datetime, time, timezone, timedelta
 
 # Configurações do Telegram
 TELEGRAM_TOKEN = '8643990886:AAFpiqleSSN7-jT0HaxpfaIY102HWvSwQ3g'
@@ -45,11 +46,12 @@ def enviar_telegram(mensagem):
         print("Erro ao enviar Telegram:", e)
 
 def calcular_poc_e_fibonacci(df):
-    if df is None or df.empty or len(df) < 50:
+    if df is None or df.empty or len(df) < 20:
         return None, None, None, None
 
-    swing_high = df['high'].iloc[-50:].max()
-    swing_low = df['low'].iloc[-50:].min()
+    # Baseado nas últimas 20 velas
+    swing_high = df['high'].iloc[-20:].max()
+    swing_low = df['low'].iloc[-20:].min()
     
     diff = swing_high - swing_low
     fib_618 = swing_high - (diff * 0.618)
@@ -57,10 +59,10 @@ def calcular_poc_e_fibonacci(df):
     fib_382 = swing_high - (diff * 0.382)
 
     if 'volume' in df.columns:
-        idx_max_vol = df['volume'].iloc[-50:].idxmax()
+        idx_max_vol = df['volume'].iloc[-20:].idxmax()
         poc_price = df['close'].loc[idx_max_vol]
     else:
-        poc_price = df['close'].iloc[-50:].median()
+        poc_price = df['close'].iloc[-20:].median()
 
     return poc_price, fib_618, fib_500, fib_382
 
@@ -93,13 +95,13 @@ def analisar_fibonacci_poc(df, nome_ativo):
 
     if toque_fib_suporte and perto_poc and rejeicao_alta and c > o:
         sinal = (
-            "🎯 *SINAL M1 - FIBONACCI + POC (CALL)* 🎯\n\n"
+            "🎯 *SINAL M1 - FIBO + POC (20 VELAS) [CALL]* 🎯\n\n"
             f"📊 *Ativo:* {nome_ativo}\n"
             "⏰ *Tempo Gráfico:* M1 (Expiração 1 Minuto)\n"
             "📈 *Direção:* 🟢 *CALL (COMPRA)*\n\n"
-            "🕯️ *Confluência Identificada:*\n"
+            "🕯️ *Confluência Identificada (Últimas 20 Velas):*\n"
             "• Retração em Zona de Fibonacci (50% / 61.8%)\n"
-            "• Confluência exata com a POC (Point of Control)\n"
+            "• Confluência com a POC de Volume Recente\n"
             "• Rejeição Forte Detectada (Pavio Inferior)\n\n"
             "⚡ *Ação:* Abra a ordem de COMPRA para a próxima vela de M1!"
         )
@@ -111,22 +113,35 @@ def analisar_fibonacci_poc(df, nome_ativo):
 
     if toque_fib_resistencia and perto_poc_res and rejeicao_baixa and c < o:
         sinal = (
-            "🎯 *SINAL M1 - FIBONACCI + POC (PUT)* 🎯\n\n"
+            "🎯 *SINAL M1 - FIBO + POC (20 VELAS) [PUT]* 🎯\n\n"
             f"📊 *Ativo:* {nome_ativo}\n"
             "⏰ *Tempo Gráfico:* M1 (Expiração 1 Minuto)\n"
             "📈 *Direção:* 🔴 *PUT (VENDA)*\n\n"
-            "🕯️ *Confluência Identificada:*\n"
+            "🕯️ *Confluência Identificada (Últimas 20 Velas):*\n"
             "• Retração em Zona de Fibonacci\n"
-            "• Confluência exata com a POC (Point of Control)\n"
+            "• Confluência com a POC de Volume Recente\n"
             "• Rejeição Forte Detectada (Pavio Superior)\n\n"
             "⚡ *Ação:* Abra a ordem de VENDA para a próxima vela de M1!"
         )
         enviar_telegram(sinal)
 
 if __name__ == "__main__":
+    # Ajuste de Fuso Horário (Brasil - Brasília: UTC-3) ou horário do servidor GitHub (UTC)
+    # Como o GitHub roda em UTC, ajustamos para o horário do Brasil (UTC-3)
+    fuso_brasil = timezone(timedelta(hours=-3))
+    agora_brasil = datetime.now(fuso_brasil).time()
+
+    hora_inicio = time(8, 0)   # 08:00
+    hora_fim = time(22, 0)     # 22:00
+
+    # Verifica se está dentro do horário permitido
+    if not (hora_inicio <= agora_brasil <= hora_fim):
+        print(f"Fora do horário de operação ({agora_brasil}). Robô em pausa.")
+        sys.exit(0)
+
     # Analisa Criptos
     for nome_ativo, ticker in PARES_CRIPTOS.items():
-        url = f"https://data-api.binance.vision/api/v3/klines?symbol={ticker}&interval=1m&limit=100"
+        url = f"https://data-api.binance.vision/api/v3/klines?symbol={ticker}&interval=1m&limit=50"
         try:
             response = requests.get(url, timeout=10)
             data = response.json()
