@@ -30,52 +30,70 @@ def enviar_telegram(mensagem):
     except Exception as e:
         print("Erro ao enviar Telegram:", e)
 
-def analisar_hammer_shooting_star(df, nome_ativo):
+def analisar_estrategia_reversao(df, nome_ativo):
+    # Precisamos de pelo menos 5 velas para analisar o padrão na penúltima e a vela seguinte fechada
     if df is None or df.empty or len(df) < 5:
         return
 
-    # Analisa a última vela fechada (índice -1)
-    idx = -1
-    o = df['open'].iloc[idx]
-    c = df['close'].iloc[idx]
-    h = df['high'].iloc[idx]
-    l = df['low'].iloc[idx]
+    # Vela de Sinal (penúltima vela fechada: índice -2)
+    idx_sinal = -2
+    o_sinal = df['open'].iloc[idx_sinal]
+    c_sinal = df['close'].iloc[idx_sinal]
+    h_sinal = df['high'].iloc[idx_sinal]
+    l_sinal = df['low'].iloc[idx_sinal]
 
-    corpo = abs(c - o)
-    tamanho_total = h - l
-    if tamanho_total == 0:
+    corpo_sinal = abs(c_sinal - o_sinal)
+    tamanho_total_sinal = h_sinal - l_sinal
+    if tamanho_total_sinal == 0:
         return
 
-    pavio_inferior = min(o, c) - l
-    pavio_superior = h - max(o, c)
+    pavio_inferior = min(o_sinal, c_sinal) - l_sinal
+    pavio_superior = h_sinal - max(o_sinal, c_sinal)
 
-    # Regra do Hammer (Martelo): pavio inferior pelo menos 2x o corpo, pequeno pavio superior
-    is_hammer = (pavio_inferior >= (corpo * 2)) and (pavio_superior <= corpo * 0.5) and (corpo > 0)
+    # Identifica os padrões na penúltima vela
+    is_hammer = (pavio_inferior >= (corpo_sinal * 2)) and (pavio_superior <= corpo_sinal * 0.5) and (corpo_sinal > 0)
+    is_shooting_star = (pavio_superior >= (corpo_sinal * 2)) and (pavio_inferior <= corpo_sinal * 0.5) and (corpo_sinal > 0)
 
-    # Regra da Shooting Star (Estrela Cadente): pavio superior pelo menos 2x o corpo, pequeno pavio inferior
-    is_shooting_star = (pavio_superior >= (corpo * 2)) and (pavio_inferior <= corpo * 0.5) and (corpo > 0)
+    if not is_hammer and not is_shooting_star:
+        return
 
-    if is_hammer:
+    # Vela de Confirmação/Espera (última vela fechada: índice -1)
+    idx_conf = -1
+    o_conf = df['open'].iloc[idx_conf]
+    c_conf = df['close'].iloc[idx_conf]
+
+    vela_vermelha = c_conf < o_conf
+    vela_verde = c_conf > o_conf
+
+    # Se apareceu Hammer e a vela seguinte foi vermelha -> Entrar comprado (CALL)
+    if is_hammer and vela_vermelha:
         sinal = (
-            "🎯 *SINAL M1 - HAMMER (CALL)* 🎯\n\n"
+            "🎯 *SINAL M1 - HAMMER + CONFIRMAÇÃO (CALL)* 🎯\n\n"
             f"📊 *Ativo:* {nome_ativo}\n"
             "⏰ *Tempo Gráfico:* M1 (Expiração 1 Minuto)\n"
             "📈 *Direção:* 🟢 *CALL (COMPRA)*\n\n"
-            "🕯️ *Padrão Identificado:* Martelo de Alta (Hammer)\n"
-            "🔄 *Gerenciamento:* Entrada Principal + Até 2 Gales (Gale 1 e Gale 2)\n\n"
-            "⚡ *Ação:* Abra a ordem de COMPRA para a próxima vela de M1!"
+            "🕯️ *Lógica Aplicada:*\n"
+            "• Padrão Hammer Identificado\n"
+            "• Vela de Confirmação Fechou Vermelha\n"
+            "• Entrada Oposta (Reversão)\n"
+            "🔄 *Gerenciamento:* Entrada Principal + Até 2 Gales\n\n"
+            "⚡ *Ação:* Abra a ordem de COMPRA para a próxima vela!"
         )
         enviar_telegram(sinal)
 
-    elif is_shooting_star:
+    # Se apareceu Shooting Star e a vela seguinte foi verde -> Entrar vendido (PUT)
+    elif is_shooting_star and vela_verde:
         sinal = (
-            "🎯 *SINAL M1 - SHOOTING STAR (PUT)* 🎯\n\n"
+            "🎯 *SINAL M1 - SHOOTING STAR + CONFIRMAÇÃO (PUT)* 🎯\n\n"
             f"📊 *Ativo:* {nome_ativo}\n"
             "⏰ *Tempo Gráfico:* M1 (Expiração 1 Minuto)\n"
             "📈 *Direção:* 🔴 *PUT (VENDA)*\n\n"
-            "🕯️ *Padrão Identificado:* Estrela Cadente de Baixa (Shooting Star)\n"
-            "🔄 *Gerenciamento:* Entrada Principal + Até 2 Gales (Gale 1 e Gale 2)\n\n"
-            "⚡ *Ação:* Abra a ordem de VENDA para a próxima vela de M1!"
+            "🕯️ *Lógica Aplicada:*\n"
+            "• Padrão Shooting Star Identificado\n"
+            "• Vela de Confirmação Fechou Verde\n"
+            "• Entrada Oposta (Reversão)\n"
+            "🔄 *Gerenciamento:* Entrada Principal + Até 2 Gales\n\n"
+            "⚡ *Ação:* Abra a ordem de VENDA para a próxima vela!"
         )
         enviar_telegram(sinal)
 
@@ -107,6 +125,6 @@ if __name__ == "__main__":
                 df['open'] = df['open'].astype(float)
                 df['high'] = df['high'].astype(float)
                 df['low'] = df['low'].astype(float)
-                analisar_hammer_shooting_star(df, nome_ativo)
+                analisar_estrategia_reversao(df, nome_ativo)
         except Exception as e:
             print(f"Erro ao analisar {nome_ativo}: {e}")
