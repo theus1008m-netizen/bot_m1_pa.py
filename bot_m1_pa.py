@@ -31,7 +31,6 @@ def enviar_telegram(mensagem):
         print("Erro ao enviar Telegram:", e)
 
 def analisar_estrategia_reversao(df, nome_ativo):
-    # Precisamos de pelo menos 5 velas para analisar o padrão na penúltima e a vela seguinte fechada
     if df is None or df.empty or len(df) < 5:
         return
 
@@ -42,17 +41,17 @@ def analisar_estrategia_reversao(df, nome_ativo):
     h_sinal = df['high'].iloc[idx_sinal]
     l_sinal = df['low'].iloc[idx_sinal]
 
-    corpo_sinal = abs(c_sinal - o_sinal)
-    tamanho_total_sinal = h_sinal - l_sinal
-    if tamanho_total_sinal == 0:
+    corpo = abs(c_sinal - o_sinal)
+    tamanho_total = h_sinal - l_sinal
+    if tamanho_total == 0:
         return
 
     pavio_inferior = min(o_sinal, c_sinal) - l_sinal
     pavio_superior = h_sinal - max(o_sinal, c_sinal)
 
-    # Identifica os padrões na penúltima vela
-    is_hammer = (pavio_inferior >= (corpo_sinal * 2)) and (pavio_superior <= corpo_sinal * 0.5) and (corpo_sinal > 0)
-    is_shooting_star = (pavio_superior >= (corpo_sinal * 2)) and (pavio_inferior <= corpo_sinal * 0.5) and (corpo_sinal > 0)
+    # Proporção flexibilizada (1.5x em vez de 2x) para alinhar melhor com o TradingView
+    is_hammer = (pavio_inferior >= (corpo * 1.5)) and (pavio_superior <= corpo * 0.8) and (corpo > 0)
+    is_shooting_star = (pavio_superior >= (corpo * 1.5)) and (pavio_inferior <= corpo * 0.8) and (corpo > 0)
 
     if not is_hammer and not is_shooting_star:
         return
